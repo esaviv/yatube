@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Об авторе проекта{% endblock %}
+{% block content %}
+
+<div class="row">
+  <h1>Привет, я разработчик</h1>
+  <aside class="col-12 col-md-3">
+    <ul class="list-group list-group-flush">
+      <li class="list-group-item">
+        Катя, 26 лет
+      </li>
+      <li class="list-group-item">
+        Калининград
+      </li>
+      <li class="list-group-item">
+        <p>
+          <a href="https://github.com/esaviv"><img src="{% static 'img/github.png' %}" width="70" height="70" alt=""></a>
+          <a href="https://t.me/eka_saviv"><img src="{% static 'img/telegram.png' %}" width="40" height="40" alt=""></a>
+        </p>
+      </li>
+    </ul>
+  </aside>
+  <article class="col-12 col-md-9">
+    <p>Морской радиоинженер в запасе, будущий программист. Сейчас работаю в энергосбытовой компании в отделе ИТ, 
+      прежде 7 лет ходила в море на океанографическом  судне.</p>
+      <p>В мир программирования меня привела счастливая случайность.</p>
+      <p>Благодарю за поддержку и всяческую помощь моего мопса Пчёлу, маму, сестру и моего молодого человека; 
+      искренне рада текущей работе, она способствует моей эффективной учебе и развитию; 
+      и, конечно же, посылаю воздушные поцелуи тому чудесному консультанту в Skillbox, который взамен купленного 
+      мною курса кройки и шитья предложил мне базовый курс по программированию на Python!</p>
+  </article>
+</div>
+{% endblock %}
+
