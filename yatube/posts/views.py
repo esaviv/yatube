@@ -7,19 +7,20 @@ from django.views.decorators.cache import cache_page
 from .forms import CommentForm, PostForm
 from .models import Comment, Follow, Group, Post, User
 
+CACHE_TIMEOUT_INDEX = 20
 
-def create_page_obj(request, posts, count):
-    paginator = Paginator(posts, count)
+
+def paginate_page(request, posts):
+    paginator = Paginator(posts, settings.COUNT_POSTS)
     page_number = request.GET.get('page')
     return paginator.get_page(page_number)
 
 
-@cache_page(20, key_prefix='index_page')
+@cache_page(CACHE_TIMEOUT_INDEX, key_prefix='index_page')
 def index(request):
     posts = Post.objects.select_related("author", "group")
-    page_obj = create_page_obj(request, posts, settings.COUNT_POSTS)
     context = {
-        "page_obj": page_obj,
+        "page_obj": paginate_page(request, posts)
     }
     return render(request, "posts/index.html", context)
 
@@ -27,10 +28,9 @@ def index(request):
 def group_posts(request, slug):
     group = get_object_or_404(Group, slug=slug)
     posts = group.posts.select_related("author", "group")
-    page_obj = create_page_obj(request, posts, settings.COUNT_POSTS)
     context = {
         "group": group,
-        "page_obj": page_obj,
+        "page_obj": paginate_page(request, posts)
     }
     return render(request, "posts/group_list.html", context)
 
@@ -38,16 +38,11 @@ def group_posts(request, slug):
 def profile(request, username):
     author = get_object_or_404(User, username=username)
     posts = author.posts.select_related("author", "group")
-    page_obj = create_page_obj(request, posts, settings.COUNT_POSTS)
-    following = False
-    if request.user.is_authenticated:
-        following = Follow.objects.filter(
-            user=request.user,
-            author=author
-        ).exists()
+    following = (request.user.is_authenticated
+                 and author.following.filter(user=request.user).exists())
     context = {
         "author": author,
-        "page_obj": page_obj,
+        "page_obj": paginate_page(request, posts),
         "following": following
     }
     return render(request, "posts/profile.html", context)
@@ -114,53 +109,33 @@ def post_edit(request, post_id):
     context = {
         'post': post,
         'form': form,
-        'is_edit': True,
+        'is_edit': True
     }
     return render(request, 'posts/create_post.html', context)
 
 
 @login_required
 def follow_index(request):
-    authors = Follow.objects.filter(
-        user=request.user).values_list("author_id")
     posts = Post.objects.select_related(
-        "author", "group").filter(author_id__in=authors)
-    page_obj = create_page_obj(request, posts, settings.COUNT_POSTS)
+        "author", "group").filter(author__following__user=request.user)
     context = {
-        "page_obj": page_obj,
+        "page_obj": paginate_page(request, posts),
     }
     return render(request, 'posts/follow.html', context)
 
 
 @login_required
 def profile_follow(request, username):
-    if username != request.user.username:
+    if request.user.username != username:
         Follow.objects.update_or_create(
             user=request.user,
-            author=User.objects.get(username=username)
+            author=get_object_or_404(User, username=username)
         )
-    authors = Follow.objects.filter(user=request.user).values_list("author_id")
-    posts = Post.objects.select_related(
-        "author", "group").filter(author_id__in=authors)
-    page_obj = create_page_obj(request, posts, settings.COUNT_POSTS)
-    context = {
-        "page_obj": page_obj,
-    }
-    return render(request, 'posts/follow.html', context)
+    return redirect("posts:follow_index")
 
 
 @login_required
 def profile_unfollow(request, username):
-    if username != request.user.username:
-        Follow.objects.get(
-            user=request.user,
-            author=User.objects.get(username=username)
-        ).delete()
-    authors = Follow.objects.filter(user=request.user).values_list("author_id")
-    posts = Post.objects.select_related(
-        "author", "group").filter(author_id__in=authors)
-    page_obj = create_page_obj(request, posts, settings.COUNT_POSTS)
-    context = {
-        "page_obj": page_obj,
-    }
-    return render(request, 'posts/follow.html', context)
+    author = get_object_or_404(User, username=username)
+    author.following.filter(user=request.user).delete()
+    return redirect("posts:follow_index")
