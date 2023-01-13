@@ -21,11 +21,12 @@ class PostsPagesTests(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.group = Group.objects.create(
-            title='Тестовая группа',
-            slug='test-slug',
-            description='Тестовое описание',
+            title="Тестовая группа",
+            slug="test-slug",
+            description="Тестовое описание",
         )
         cls.auth = User.objects.create_user(username="auth")
+        cls.user = User.objects.create_user(username="user")
         small_gif = (
             b'\x47\x49\x46\x38\x39\x61\x02\x00'
             b'\x01\x00\x80\x00\x00\x00\x00\x00'
@@ -35,13 +36,13 @@ class PostsPagesTests(TestCase):
             b'\x0A\x00\x3B'
         )
         uploaded = SimpleUploadedFile(
-            name='small.gif',
+            name="small.gif",
             content=small_gif,
-            content_type='image/gif'
+            content_type="image/gif"
         )
         cls.post = Post.objects.create(
             author=cls.auth,
-            text='Тестовый пост',
+            text="Тестовый пост",
             group=cls.group,
             image=uploaded
         )
@@ -54,6 +55,9 @@ class PostsPagesTests(TestCase):
     def setUp(self):
         self.authorized_author = Client()
         self.authorized_author.force_login(self.auth)
+
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user)
 
         cache.clear()
 
@@ -74,6 +78,7 @@ class PostsPagesTests(TestCase):
             reverse("posts:post_edit",
                     kwargs={"post_id": f"{self.post.pk}"}
                     ): "posts/create_post.html",
+            reverse("posts:follow_index"): "posts/follow.html"
         }
         for reverse_name, template in templates_pages_names.items():
             with self.subTest(reverse_name=reverse_name):
@@ -185,7 +190,8 @@ class PostsPagesTests(TestCase):
 
     def test_post_create_edit_page_show_correct_context(self):
         """Шаблоны post_create сформирован с правильным контекстом
-        для создания и редоктирования поста."""
+        для создания и редоктирования поста.
+        """
         urls_parameters = {
             "posts:post_create": ({}, False),
             "posts:post_edit": ({"post_id": self.post.pk}, True)
@@ -200,6 +206,7 @@ class PostsPagesTests(TestCase):
             self.assertEqual(is_edit, parameters[1])
 
     def test_index_cache(self):
+        """Проверка кеширования главной страницы."""
         def get_page_obj(self):
             responce = self.authorized_author.get(reverse("posts:index"))
             return responce.content
@@ -217,3 +224,23 @@ class PostsPagesTests(TestCase):
         page_obj_after_clear_cache = get_page_obj(self)
         self.assertNotEqual(page_obj_after_delete_posts,
                             page_obj_after_clear_cache)
+
+    def test_follow_index_page_show_correct_context_follow_unfollow(self):
+        """Авторизованный пользователь может подписываться на других
+        пользователей и удалять их из подписок.
+        Запись пользователя появляется в ленте тех, кто на него подписан
+        и не появляется в ленте тех, кто не подписан.
+        """
+        self.authorized_client.get(
+            reverse("posts:profile_follow", kwargs={"username": self.auth}))
+
+        response = self.authorized_client.get(reverse("posts:follow_index"))
+        posts = response.context["page_obj"]
+        self.assertEqual(len(posts), 1)
+        self.check_post(posts[0])
+
+        self.authorized_client.get(
+            reverse("posts:profile_unfollow", kwargs={"username": self.auth}))
+
+        response = self.authorized_client.get(reverse("posts:follow_index"))
+        self.assertEqual(len(response.context["page_obj"]), 0)

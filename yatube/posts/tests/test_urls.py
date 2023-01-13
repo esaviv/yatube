@@ -11,6 +11,7 @@ class PostsURLTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.user = User.objects.create_user(username="user")
         cls.auth = User.objects.create_user(username="auth")
         cls.group = Group.objects.create(
             title='Тестовая группа',
@@ -56,15 +57,21 @@ class PostsURLTests(TestCase):
                 responce = self.authorized_author.get(url)
                 self.assertEqual(responce.status_code, HTTPStatus.OK)
 
-    def test_urls_post_create_edit_redirect_anonymous_on_admin_login(self):
-        """Страницы по адресу /create/, /posts/1/edit/
+    def test_urls_redirect_anonymous_on_admin_login(self):
+        """Страницы по адресу /create/, /posts/1/edit/,
+        /follow/, /profile/auth/follow/, /profile/auth/unfollow/
         перенаправят анонимного пользователя на страницу логина.
         """
         login_first = "/auth/login/?next="
         urls = {
             "/create/": f"{login_first}/create/",
             f"/posts/{self.post.pk}/edit/":
-            f"{login_first}/posts/{self.post.pk}/edit/"
+            f"{login_first}/posts/{self.post.pk}/edit/",
+            "/follow/": f"{login_first}/follow/",
+            f"/profile/{self.auth}/follow/":
+            f"{login_first}/profile/{self.auth}/follow/",
+            f"/profile/{self.auth}/unfollow/":
+            f"{login_first}/profile/{self.auth}/unfollow/"
         }
         for url, redirect_url in urls.items():
             with self.subTest(url=url):
@@ -77,14 +84,25 @@ class PostsURLTests(TestCase):
         """Страница по адресу /posts/1/edit/ перенаправят авторизированного
         не автора на страницу с детальной информацией о посте.
         """
-        user = User.objects.create_user(username="user")
         authorized_client = Client()
-        authorized_client.force_login(user)
+        authorized_client.force_login(self.user)
 
         response = authorized_client.get(
             f"/posts/{self.post.pk}/edit/",
             follow=True)
         self.assertRedirects(response, f"/posts/{self.post.pk}/")
+
+    def test_url_profile_follow_unfollow_redirect_to_follow_index(self):
+        urls = [
+            f"/profile/{self.user}/follow/",
+            f"/profile/{self.user}/unfollow/"
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.authorized_author.get(
+                    url,
+                    follow=True)
+                self.assertRedirects(response, "/follow/")
 
     def test_posts_urls_use_correct_template(self):
         """URL-адреса страниц, доступных аторизированному автору,
@@ -96,7 +114,8 @@ class PostsURLTests(TestCase):
             f"/group/{self.group.slug}/": "posts/group_list.html",
             f"/posts/{self.post.pk}/": "posts/post_detail.html",
             "/create/": "posts/create_post.html",
-            f"/posts/{self.post.pk}/edit/": "posts/create_post.html"
+            f"/posts/{self.post.pk}/edit/": "posts/create_post.html",
+            "/follow/": "posts/follow.html"
         }
         for url, template in url_template_names.items():
             with self.subTest(url=url):
