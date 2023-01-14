@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import cache_page
 
 from .forms import CommentForm, PostForm
-from .models import Comment, Follow, Group, Post, User
+from .models import Follow, Group, Post, User
 
 CACHE_TIMEOUT_INDEX = 20
 
@@ -38,7 +38,8 @@ def group_posts(request, slug):
 def profile(request, username):
     author = get_object_or_404(User, username=username)
     posts = author.posts.select_related("author", "group")
-    following = author.following.exists()
+    following = (request.user.is_authenticated
+                 and author.following.filter(user=request.user).exists())
     context = {
         "author": author,
         "page_obj": paginate_page(request, posts),
@@ -50,7 +51,7 @@ def profile(request, username):
 def post_detail(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
     form = CommentForm(request.POST or None)
-    comments = Comment.objects.filter(post_id=post.pk)
+    comments = post.comments.select_related("author")
     if request.method == "POST" and form.is_valid():
         add_comment(request, post_id=post.pk)
     context = {
@@ -125,10 +126,12 @@ def follow_index(request):
 
 @login_required
 def profile_follow(request, username):
-    if request.user.username != username:
-        Follow.objects.update_or_create(
-            user=request.user,
-            author=get_object_or_404(User, username=username)
+    user = request.user
+    author = get_object_or_404(User, username=username)
+    if user != author:
+        Follow.objects.get_or_create(
+            user=user,
+            author=author
         )
     return redirect("posts:follow_index")
 

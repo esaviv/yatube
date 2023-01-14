@@ -207,40 +207,61 @@ class PostsPagesTests(TestCase):
 
     def test_index_cache(self):
         """Проверка кеширования главной страницы."""
-        def get_page_obj(self):
-            responce = self.authorized_author.get(reverse("posts:index"))
-            return responce.content
-
-        page_obj_before_delete_posts = get_page_obj(self)
+        page_obj_before_delete_posts = self.authorized_author.get(
+            reverse("posts:index")).content
 
         Post.objects.all().delete()
 
-        page_obj_after_delete_posts = get_page_obj(self)
+        page_obj_after_delete_posts = self.authorized_author.get(
+            reverse("posts:index")).content
         self.assertEqual(page_obj_before_delete_posts,
                          page_obj_after_delete_posts)
 
         cache.clear()
 
-        page_obj_after_clear_cache = get_page_obj(self)
-        self.assertNotEqual(page_obj_after_delete_posts,
+        page_obj_after_clear_cache = self.authorized_author.get(
+            reverse("posts:index")).content
+        self.assertNotEqual(page_obj_before_delete_posts,
                             page_obj_after_clear_cache)
 
-    def test_follow_index_page_show_correct_context_follow_unfollow(self):
-        """Авторизованный пользователь может подписываться на других
-        пользователей и удалять их из подписок.
-        Запись пользователя появляется в ленте тех, кто на него подписан
-        и не появляется в ленте тех, кто не подписан.
-        """
+    def test_post_exists_at_followed(self):
+        """Пост появляется у тех, кто подписан."""
         self.authorized_client.get(
             reverse("posts:profile_follow", kwargs={"username": self.auth}))
-
         response = self.authorized_client.get(reverse("posts:follow_index"))
         posts = response.context["page_obj"]
         self.assertEqual(len(posts), 1)
         self.check_post(posts[0])
 
+    def test_post_not_exists_at_no_followed(self):
+        """Пост не появляется у тех, кто не подписан."""
+        response = self.authorized_client.get(reverse("posts:follow_index"))
+        self.assertEqual(len(response.context["page_obj"]), 0)
+
+    def test_authorized_client_can_follow(self):
+        """Авторизованной пользователь может подписаться."""
+        self.authorized_client.get(
+            reverse("posts:profile_follow", kwargs={"username": self.auth}))
+
+        count_follows = self.auth.following.count()
+        self.assertEqual(count_follows, 1)
+
+        follow = self.auth.following.get()
+        follow_attributes = {
+            follow.user: follow.user,
+            follow.author: follow.author,
+        }
+        for attribute, value in follow_attributes.items():
+            with self.subTest(attribute=attribute):
+                self.assertEqual(attribute, value)
+
+    def test_authorized_client_can_unfollow(self):
+        """Авторизованный пользователь может отписаться."""
+        self.authorized_client.get(
+            reverse("posts:profile_follow", kwargs={"username": self.auth}))
+
         self.authorized_client.get(
             reverse("posts:profile_unfollow", kwargs={"username": self.auth}))
 
-        response = self.authorized_client.get(reverse("posts:follow_index"))
-        self.assertEqual(len(response.context["page_obj"]), 0)
+        count_follows = self.auth.following.count()
+        self.assertEqual(count_follows, 0)

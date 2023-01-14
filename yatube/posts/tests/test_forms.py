@@ -4,7 +4,6 @@ from http import HTTPStatus
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -44,8 +43,6 @@ class PostFormTests(TestCase):
 
         self.guest_client = Client()
 
-        cache.clear()
-
     def test_unauth_user_cant_publish_comment(self):
         form_data = {
             "post": self.post,
@@ -72,6 +69,15 @@ class PostFormTests(TestCase):
             follow=True
         )
         self.assertEqual(Comment.objects.count(), 1)
+        comment = Comment.objects.first()
+        comment_attributes = {
+            comment.post: self.post,
+            comment.author: self.auth,
+            comment.text: form_data["text"]
+        }
+        for attribute, value in comment_attributes.items():
+            with self.subTest(attribute=attribute):
+                self.assertEqual(attribute, value)
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_unauth_user_cant_publish_post(self):

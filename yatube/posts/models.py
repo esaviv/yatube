@@ -35,7 +35,9 @@ class Post(CreatedModel):
     image = models.ImageField(
         "Картинка",
         upload_to='posts/',
-        blank=True
+        blank=True,
+        null=True,
+        help_text="Картинка, которая хорошо дополнит тест"
     )
 
     class Meta():
@@ -50,7 +52,7 @@ class Comment(CreatedModel):
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
-        verbose_name="Пост"
+        verbose_name="Пост",
     )
     author = models.ForeignKey(
         User,
@@ -70,7 +72,7 @@ class Follow(models.Model):
         User,
         on_delete=models.CASCADE,
         verbose_name="Пользователь",
-        related_name='follower'
+        related_name="follower"
     )
     author = models.ForeignKey(
         User,
@@ -84,9 +86,5 @@ class Follow(models.Model):
             models.UniqueConstraint(
                 fields=["user", "author"],
                 name="unique_follow"
-            ),
-            models.CheckConstraint(
-                check=~models.Q(
-                    user=models.F("author")
-                ), name="no_follow_yourself")
+            )
         ]
