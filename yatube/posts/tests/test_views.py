@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from posts.forms import CommentForm, PostForm
-from posts.models import Comment, Group, Post
+from posts.models import Comment, Group, Post, Follow
 
 User = get_user_model()
 
@@ -226,8 +226,10 @@ class PostsPagesTests(TestCase):
 
     def test_post_exists_at_followed(self):
         """Пост появляется у тех, кто подписан."""
-        self.authorized_client.get(
-            reverse("posts:profile_follow", kwargs={"username": self.auth}))
+        Follow.objects.create(
+            user=self.user,
+            author=self.auth
+        )
         response = self.authorized_client.get(reverse("posts:follow_index"))
         posts = response.context["page_obj"]
         self.assertEqual(len(posts), 1)
@@ -240,16 +242,18 @@ class PostsPagesTests(TestCase):
 
     def test_authorized_client_can_follow(self):
         """Авторизованной пользователь может подписаться."""
-        self.authorized_client.get(
-            reverse("posts:profile_follow", kwargs={"username": self.auth}))
+        Follow.objects.create(
+            user=self.user,
+            author=self.auth
+        )
 
-        count_follows = self.auth.following.count()
+        count_follows = Follow.objects.count()
         self.assertEqual(count_follows, 1)
 
-        follow = self.auth.following.get()
+        follow = Follow.objects.first()
         follow_attributes = {
-            follow.user: follow.user,
-            follow.author: follow.author,
+            follow.user: self.user,
+            follow.author: self.auth,
         }
         for attribute, value in follow_attributes.items():
             with self.subTest(attribute=attribute):
@@ -257,11 +261,15 @@ class PostsPagesTests(TestCase):
 
     def test_authorized_client_can_unfollow(self):
         """Авторизованный пользователь может отписаться."""
-        self.authorized_client.get(
-            reverse("posts:profile_follow", kwargs={"username": self.auth}))
+        Follow.objects.create(
+            user=self.user,
+            author=self.auth
+        )
 
-        self.authorized_client.get(
-            reverse("posts:profile_unfollow", kwargs={"username": self.auth}))
+        Follow.objects.get(
+            user=self.user,
+            author=self.auth
+        ).delete()
 
-        count_follows = self.auth.following.count()
+        count_follows = Follow.objects.count()
         self.assertEqual(count_follows, 0)

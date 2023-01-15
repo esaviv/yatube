@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Ошибка 500{% endblock %}
+{% block content %}
+  <h1>O-o! Внутренняя ошибка сервера</h1>
+  <p>Дело не в Вас, просто серверу сейчас необходимо побыть одному</p>
+  <a href="{% url 'posts:index' %}">Попробуйте пойти на главную</a>
+{% endblock %} 
